@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Park Run — Punggol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --bg2: #16213e;
+    --accent: #00d2ff;
+    --accent2: #7b2ff7;
+    --text: #e8e8e8;
+    --muted: #8892a0;
+    --green: #00e676;
+    --yellow: #ffd600;
+    --red: #ff5252;
+    --card: #1f2b45;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    touch-action: manipulation;
+  }
+
+  /* MAP */
+  #map {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 0;
+  }
+  #map.hidden { display: none; }
+
+  /* TOP BAR */
+  #topbar {
+    position: relative; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, rgba(26,26,46,0.95) 0%, transparent 100%);
+  }
+  #topbar .logo { font-weight: 700; font-size: 18px; letter-spacing: -0.5px; }
+  #topbar .logo span { color: var(--accent); }
+  #topbar .icon-btn {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--card); border: none; color: var(--text);
+    font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  #topbar .icon-btn:active { transform: scale(0.95); }
+
+  /* STATS PANEL */
+  #stats-panel {
+    position: fixed; top: 64px; left: 0; right: 0; z-index: 10;
+    display: none;
+    padding: 0 12px 12px;
+  }
+  #stats-panel.visible { display: block; }
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  }
+  .stat-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 12px 8px;
+    text-align: center;
+    min-height: 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .stat-card .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 700; color: var(--accent);
+    line-height: 1.1;
+  }
+  .stat-card .lbl {
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-top: 4px;
+  }
+
+  /* BOTTOM PANEL */
+  #bottom-panel {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+    background: linear-gradient(0deg, rgba(26,26,46,0.98) 60%, transparent 100%);
+    padding: 20px 16px 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+
+  /* PROGRESS */
+  #lap-progress-wrap {
+    width: 100%; display: none;
+  }
+  #lap-progress-wrap.visible { display: block; }
+  #lap-label { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 4px; }
+  #lap-progress-bar {
+    width: 100%; height: 6px; background: var(--card); border-radius: 3px; overflow: hidden;
+  }
+  #lap-progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 3px; width: 0%;
+  }
+
+  /* NAV DISPLAY */
+  #nav-display {
+    display: none;
+    width: 100%;
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  #nav-display.visible { display: block; }
+  #nav-turn { font-size: 36px; margin-bottom: 4px; }
+  #nav-instruction { font-size: 16px; font-weight: 600; }
+  #nav-distance { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* LAPS SUMMARY */
+  #laps-summary {
+    display: none;
+    width: 100%;
+    max-height: 120px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  #laps-summary.visible { display: block; }
+  .lap-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 12px; background: var(--card); border-radius: 10px; margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  }
+  .lap-row .lap-num { color: var(--accent); font-weight: 700; }
+  .lap-row .lap-time { color: var(--green); }
+  .lap-row .lap-pace { color: var(--muted); }
+
+  /* MAIN ACTION BUTTON */
+  #action-btn {
+    width: 100%; height: 56px;
+    border-radius: 28px; border: none; cursor: pointer;
+    font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 700;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  #action-btn.ready {
+    background: var(--green); color: #000;
+  }
+  #action-btn.running {
+    background: var(--red); color: #fff;
+  }
+  #action-btn:active { transform: scale(0.98); }
+
+  /* VOICE TOGGLE */
+  #voice-row {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 13px; color: var(--muted);
+  }
+  #voice-toggle {
+    width: 40px; height: 22px; border-radius: 11px;
+    appearance: none; -webkit-appearance: none;
+    background: var(--card); cursor: pointer; position: relative;
+    transition: background 0.2s;
+  }
+  #voice-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%; background: var(--muted);
+    transition: all 0.2s;
+  }
+  #voice-toggle:checked { background: var(--accent); }
+  #voice-toggle:checked::after { left: 20px; background: #fff; }
+
+  /* HISTORY PANEL */
+  #history-panel {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: var(--bg);
+    display: none; flex-direction: column;
+    overflow-y: auto;
+  }
+  #history-panel.visible { display: flex; }
+  #history-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--card);
+    position: sticky; top: 0; background: var(--bg); z-index: 1;
+  }
+  #history-header h2 { font-size: 20px; font-weight: 700; }
+  #history-list {
+    padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .run-card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 14px; cursor: pointer;
+  }
+  .run-card:active { transform: scale(0.98); }
+  .run-card .rc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .run-card .rc-date { font-size: 13px; color: var(--muted); }
+  .run-card .rc-laps { font-size: 12px; background: var(--accent2); color: #fff; border-radius: 8px; padding: 2px 8px; font-weight: 600; }
+  .run-card .rc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+  .run-card .rc-stat .rcv { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: var(--accent); }
+  .run-card .rc-stat .rcl { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+
+  /* MAP CONTROLS */
+  #map-controls {
+    position: fixed; right: 12px; z-index: 10;
+    display: flex; flex-direction: column; gap: 6px;
+    bottom: 160px;
+  }
+  #map-controls.hidden { display: none; }
+  .map-btn {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--card); border: none; color: var(--text);
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .map-btn:active { transform: scale(0.95); }
+
+  /* PERMISSION STATE */
+  #permission-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 32px; text-align: center; gap: 16px;
+  }
+  #permission-overlay.hidden { display: none; }
+  #permission-overlay .icon { font-size: 64px; }
+  #permission-overlay h2 { font-size: 22px; }
+  #permission-overlay p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+  #permission-overlay button {
+    width: 100%; max-width: 280px; height: 52px;
+    border-radius: 26px; border: none; cursor: pointer;
+    background: var(--accent); color: #000;
+    font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 700;
+    margin-top: 8px;
+  }
+  #permission-overlay button:active { transform: scale(0.98); }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 160px; left: 50%; transform: translateX(-50%);
+    background: var(--card); color: var(--text);
+    padding: 10px 20px; border-radius: 20px; font-size: 13px;
+    z-index: 200; opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  #toast.visible { opacity: 1; }
+
+  /* SPLASH LABEL */
+  #park-name {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    z-index: 10; font-size: 13px; color: var(--accent);
+    background: rgba(26,26,46,0.8); padding: 4px 14px; border-radius: 20px;
+    border: 1px solid var(--accent);
+    display: none;
+  }
+  #park-name.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="topbar">
+  <div class="logo">Park<span>Run</span></div>
+  <button class="icon-btn" id="history-btn" aria-label="History">📋</button>
+</div>
+
+<div id="park-name">🏃 Punggol Park</div>
+
+<div id="stats-panel">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="val" id="s-dist">0.00</div>
+      <div class="lbl">KM</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" id="s-pace">--</div>
+      <div class="lbl">PACE</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" id="s-time">0:00</div>
+      <div class="lbl">TIME</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" id="s-laps">0</div>
+      <div class="lbl">LAPS</div>
+    </div>
+  </div>
+</div>
+
+<div id="map-controls" class="hidden">
+  <button class="map-btn" id="zoom-in" aria-label="Zoom in">➕</button>
+  <button class="map-btn" id="zoom-out" aria-label="Zoom out">➖</button>
+</div>
+
+<div id="bottom-panel">
+  <div id="lap-progress-wrap">
+    <div id="lap-label">Lap 1 — 0%</div>
+    <div id="lap-progress-bar"><div id="lap-progress-fill"></div></div>
+  </div>
+
+  <div id="nav-display">
+    <div id="nav-turn">🏃</div>
+    <div id="nav-instruction">Starting...</div>
+    <div id="nav-distance"></div>
+  </div>
+
+  <div id="laps-summary"></div>
+
+  <div id="voice-row">
+    🔊 Voice
+    <input type="checkbox" id="voice-toggle" checked>
+  </div>
+
+  <button id="action-btn" class="ready">▶ Start Run</button>
+</div>
+
+<div id="history-panel">
+  <div id="history-header">
+    <h2>📋 Run History</h2>
+    <button class="icon-btn" id="history-close" aria-label="Close">✕</button>
+  </div>
+  <div id="history-list"></div>
+</div>
+
+<div id="permission-overlay">
+  <div class="icon">🏃</div>
+  <h2>Enable Location</h2>
+  <p>ParkRun needs GPS access to track your run, show your position on the map, and auto-detect laps at Punggol Park.</p>
+  <button id="grant-btn">Enable Location</button>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────
+const PARK_CENTER = [1.37707, 103.89848];
+const PARK_RADIUS_M = 420; // metres — used for lap detection
+const TURN_THRESHOLD_DEG = 25;
+const ANNOUNCE_DIST_M = 120;
+const AUTO_LAP = true;
+const HISTORY_KEY = 'parkrun_history_v1';
+const VOICE_CACHE_KEY = 'parkrun_voice_ok_v1';
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+let map, trailLine;
+let watchId = null;
+let isRunning = false;
+let startTime = null;
+let pausedTime = 0;
+let pauseStart = null;
+let totalDistance = 0; // km
+let lastCoord = null;
+let trailCoords = []; // [lat, lon]
+let elevationData = [];
+let laps = [];
+let currentLap = { startTime: null, distance: 0, coords: [] };
+let currentStepIndex = 0;
+let lastSpokenInstruction = '';
+let lastAnnouncedTurnIdx = -1;
+let routeCoords = []; // OSRM [lon, lat] for navigation
+let routeTurnIndices = [];
+let currentRouteStepIndex = 0;
+let baro = null;
+let lastElevation = null;
+let voiceOk = false;
+let _voiceLoadTimeout = null;
+
+// ─── INIT ─────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  bindEvents();
+  checkVoiceCache();
+  checkPermissionState();
+  loadHistory();
+});
+
+// ─── MAP ──────────────────────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', {
+    center: PARK_CENTER,
+    zoom: 16,
+    zoomControl: false,
+    attributionControl: false,
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+  }).addTo(map);
+
+  // Park circle overlay
+  L.circle(PARK_CENTER, {
+    radius: PARK_RADIUS_M,
+    color: '#00d2ff',
+    fillColor: '#00d2ff',
+    fillOpacity: 0.04,
+    weight: 1.5,
+    dashArray: '6 8',
+  }).addTo(map);
+
+  // Center marker
+  L.circleMarker(PARK_CENTER, {
+    radius: 6, color: '#00d2ff', fillColor: '#00d2ff', fillOpacity: 0.6, weight: 2,
+  }).addTo(map);
+
+  // Init trail
+  trailLine = L.polyline([], {
+    color: '#00d2ff', weight: 4, opacity: 0.85, lineJoin: 'round',
+  }).addTo(map);
+
+  // GPS marker (hidden until run starts)
+  window._gpsMarker = L.circleMarker([0, 0], {
+    radius: 7, color: '#00e676', fillColor: '#00e676', fillOpacity: 1, weight: 2,
+    zIndexOffset: 1000,
+  }).setStyle({ opacity: 0 }).addTo(map);
+}
+
+function bindEvents() {
+  document.getElementById('action-btn').addEventListener('click', handleAction);
+  document.getElementById('grant-btn').addEventListener('click', requestPermission);
+  document.getElementById('history-btn').addEventListener('click', () => togglePanel('history'));
+  document.getElementById('history-close').addEventListener('click', () => togglePanel(''));
+  document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn());
+  document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut());
+
+  document.getElementById('voice-toggle').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      trySpeak('Voice on');
+      localStorage.setItem(VOICE_CACHE_KEY, '1');
+    }
+  });
+
+  // Map tap on trail — show pace at that point
+  map.on('click', (e) => {
+    if (!isRunning || trailCoords.length < 2) return;
+    const { lat, lng } = e.latlng;
+    const dist = getDistance([lng, lat], trailCoords[trailCoords.length - 1]);
+    if (dist < 200) {
+      showToast(`${(dist).toFixed(0)}m from current position`);
+    }
+  });
+}
+
+// ─── PERMISSION ───────────────────────────────────────────────────────────
+function checkPermissionState() {
+  if (!navigator.geolocation) {
+    showPermissionError('Geolocation is not supported by your browser.');
+    return;
+  }
+  navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
+    if (result.state === 'granted') {
+      hidePermissionOverlay();
+    }
+    result.addEventListener('change', () => {
+      if (result.state === 'granted') hidePermissionOverlay();
+      else if (result.state === 'denied') showPermissionError('Location access was denied. Please enable it in browser settings.');
+    });
+  }).catch(() => {
+    // permissions API not available — try anyway
+  });
+}
+
+function requestPermission() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      hidePermissionOverlay();
+    },
+    (err) => {
+      showPermissionError('Could not get location: ' + err.message);
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function showPermissionError(msg) {
+  document.querySelector('#permission-overlay p').textContent = msg;
+  document.querySelector('#permission-overlay .icon').textContent = '⚠️';
+}
+
+function hidePermissionOverlay() {
+  document.getElementById('permission-overlay').classList.add('hidden');
+}
+
+// ─── BAROMETER ────────────────────────────────────────────────────────────
+function initBarometer() {
+  if ('Barometer' in window) {
+    try {
+      baro = new Barometer({ sampleRate: 1000 });
+      baro.addEventListener('reading', () => {
+        const pa = baro.pressure;
+        const alt = 44330 * (1 - Math.pow(pa / 101325, 0.1903));
+        if (lastElevation !== null) {
+          const delta = alt - lastElevation;
+          // filter noise — ignore jumps > 50m in 1s
+          if (Math.abs(delta) < 50) {
+            elevationData.push({ t: Date.now(), delta });
+          }
+        }
+        lastElevation = alt;
+      });
+      baro.start();
+    } catch (e) {
+      console.warn('Barometer init failed:', e);
+    }
+  }
+}
+
+// ─── VOICE ─────────────────────────────────────────────────────────────────
+function checkVoiceCache() {
+  voiceOk = localStorage.getItem(VOICE_CACHE_KEY) === '1';
+}
+
+function speak(text) {
+  if (!text) return;
+  const toggle = document.getElementById('voice-toggle');
+  if (!toggle || !toggle.checked) return;
+  if (!('speechSynthesis' in window)) return;
+
+  if (window.speechSynthesis.pending || window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.15;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+
+  const trySpeak = () => {
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v =>
+      v.lang.startsWith('en') &&
+      (v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Victoria'))
+    );
+    if (preferred) utterance.voice = preferred;
+    try { window.speechSynthesis.speak(utterance); } catch (e) { console.warn('speak error:', e); }
+  };
+
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    trySpeak();
+  } else {
+    const onVoicesChanged = () => {
+      clearTimeout(_voiceLoadTimeout);
+      window.speechSynthesis.onvoiceschanged = null;
+      trySpeak();
+    };
+    window.speechSynthesis.onvoiceschanged = onVoicesChanged;
+    _voiceLoadTimeout = setTimeout(() => {
+      if (window.speechSynthesis.onvoiceschanged === onVoicesChanged) {
+        window.speechSynthesis.onvoiceschanged = null;
+        try { window.speechSynthesis.speak(utterance); } catch (e) {}
+      }
+    }, 3000);
+  }
+}
+
+// ─── GEOLOCATION ──────────────────────────────────────────────────────────
+function startTracking() {
+  if (watchId !== null) return;
+  initBarometer();
+  watchId = navigator.geolocation.watchPosition(
+    onGpsUpdate,
+    onGpsError,
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+  );
+}
+
+function stopTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+  if (baro) { try { baro.stop(); } catch (e) {} baro = null; }
+}
+
+function onGpsUpdate(pos) {
+  const lat = pos.coords.latitude;
+  const lon = pos.coords.longitude;
+  const accuracy = pos.coords.accuracy;
+
+  // Discard inaccurate reads
+  if (accuracy > 50) return;
+
+  const point = [lat, lon];
+
+  // Show/update GPS marker
+  window._gpsMarker.setLatLng(point).setStyle({ opacity: 1 });
+
+  if (!isRunning) return;
+
+  // Compute distance from last point
+  if (lastCoord) {
+    const dist = getDistanceM(lastCoord, point);
+    totalDistance += dist;
+    currentLap.distance += dist;
+  }
+  lastCoord = point;
+  trailCoords.push(point);
+  currentLap.coords.push(point);
+
+  // Update trail on map
+  trailLine.setLatLngs(trailCoords);
+
+  // Auto-lap detection — check if user is within PARK_RADIUS_M of park center
+  if (AUTO_LAP) checkAutoLap(lat, lon);
+
+  // Navigation (route-based turn announcements)
+  checkUpcomingTurns(lat, lon);
+
+  // Update UI
+  updateStatsDisplay();
+  updateLapProgress();
+}
+
+function onGpsError(err) {
+  console.warn('GPS error:', err.message);
+  if (isRunning) showToast('GPS signal lost — check outdoor view');
+}
+
+// ─── LAP DETECTION ────────────────────────────────────────────────────────
+function checkAutoLap(lat, lon) {
+  const distToCenter = getDistanceM([lat, lon], PARK_CENTER);
+
+  // Lap completed when: user was outside (> 1.2x radius) and is now inside (< radius)
+  const wasOutside = !currentLap.insidePark;
+  currentLap.insidePark = (distToCenter < PARK_RADIUS_M);
+
+  if (wasOutside && currentLap.insidePark && currentLap.coords.length > 10) {
+    // Only count as lap if meaningful distance covered
+    if (currentLap.distance > 200) { // at least 200m in this lap
+      const lapTime = (Date.now() - currentLap.startTime) / 1000;
+      const lapPace = lapTime > 0 ? (lapTime / 60 / (currentLap.distance / 1000)) : 0;
+      laps.push({
+        distance: currentLap.distance,
+        time: lapTime,
+        pace: lapPace,
+        startTime: currentLap.startTime,
+      });
+      speak(`Lap ${laps.length} complete. ${formatPace(lapPace)} per kilometre.`);
+      showToast(`🏁 Lap ${laps.length} — ${formatPace(lapPace)} /km`);
+
+      // Reset for next lap
+      currentLap = { startTime: Date.now(), distance: 0, coords: [], insidePark: true };
+    }
+  }
+}
+
+// ─── ROUTE NAVIGATION ─────────────────────────────────────────────────────
+function loadRoute() {
+  const [lat, lon] = PARK_CENTER;
+  const r = PARK_RADIUS_M;
+  // Circular route around the park perimeter
+  const points = 48;
+  routeCoords = [];
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    // Slightly irregular ellipse to simulate actual paths
+    const rx = r * 1.0;
+    const ry = r * 0.75;
+    const lng = lon + (rx / 111320) * Math.cos(angle);
+    const lat2 = lat + (ry / 111320) * Math.sin(angle);
+    routeCoords.push([lng, lat2]); // [lon, lat]
+  }
+
+  // Pre-compute turn indices (every ~3 points should give a turn)
+  routeTurnIndices = computeTurnIndices(routeCoords);
+
+  // Draw route on map
+  if (window._routeLine) map.removeLayer(window._routeLine);
+  window._routeLine = L.polyline(
+    routeCoords.map(c => [c[1], c[0]]),
+    { color: '#7b2ff7', weight: 3, opacity: 0.5, dashArray: '8 6' }
+  ).addTo(map);
+
+  // Center map on park
+  map.setView(PARK_CENTER, 16);
+}
+
+function computeTurnIndices(coords) {
+  const turns = [];
+  for (let i = 1; i < coords.length - 1; i++) {
+    const prev = coords[i - 1];
+    const curr = coords[i];
+    const next = coords[i + 1];
+    const angle1 = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]);
+    const angle2 = Math.atan2(next[1] - curr[1], next[0] - curr[0]);
+    let diff = Math.abs(angle2 - angle1) * 180 / Math.PI;
+    if (diff > 180) diff = 360 - diff;
+    if (diff > TURN_THRESHOLD_DEG) turns.push(i);
+  }
+  return turns;
+}
+
+function checkUpcomingTurns(lat, lon) {
+  if (routeCoords.length === 0) return;
+
+  // Find closest route point ahead of current position
+  let closestIdx = currentRouteStepIndex;
+  let minDist = Infinity;
+  for (let i = currentRouteStepIndex; i < Math.min(currentRouteStepIndex + 20, routeCoords.length); i++) {
+    const d = getDistanceM([lon, lat], routeCoords[i]);
+    if (d < minDist) { minDist = d; closestIdx = i; }
+  }
+
+  // Check next few turn points
+  for (const turnIdx of routeTurnIndices) {
+    if (turnIdx <= currentRouteStepIndex) continue;
+    const turnCoord = routeCoords[turnIdx];
+    const distToTurn = getDistanceM([lon, lat], turnCoord);
+    const angleDiff = getAngleDiffAt(turnIdx);
+
+    if (distToTurn < ANNOUNCE_DIST_M && turnIdx > lastAnnouncedTurnIdx) {
+      const step = getNextStep(angleDiff);
+      const distText = distToTurn < 20 ? 'now' : `in ${Math.round(distToTurn)}m`;
+      const fullInstruction = `${step.direction} ${distText}, then ${step.continued}.`;
+      updateNavDisplay(step, distToTurn);
+      speak(fullInstruction);
+      lastAnnouncedTurnIdx = turnIdx;
+      currentRouteStepIndex = turnIdx;
+      break;
+    }
+  }
+
+  // Update progress bar
+  const progress = closestIdx / (routeCoords.length - 1);
+  const lapPct = (progress * 100).toFixed(0);
+  const lapNum = laps.length + 1;
+  document.getElementById('lap-label').textContent = `Lap ${lapNum} — ${lapPct}%`;
+  document.getElementById('lap-progress-fill').style.width = lapPct + '%';
+}
+
+function getAngleDiffAt(idx) {
+  if (idx <= 0 || idx >= routeCoords.length - 1) return 0;
+  const prev = routeCoords[idx - 1];
+  const curr = routeCoords[idx];
+  const next = routeCoords[idx + 1];
+  const a1 = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]);
+  const a2 = Math.atan2(next[1] - curr[1], next[0] - curr[0]);
+  let diff = Math.abs(a2 - a1) * 180 / Math.PI;
+  if (diff > 180) diff = 360 - diff;
+  return diff;
+}
+
+function getNextStep(angle) {
+  if (angle < 20) return { direction: '🏃', instruction: 'Continue straight', continued: 'continue straight' };
+  if (angle < 60) return { direction: '↗️', instruction: 'Slight right', continued: 'then continue' };
+  if (angle < 110) return { direction: '➡️', instruction: 'Turn right', continued: 'then continue' };
+  if (angle < 150) return { direction: '↘️', instruction: 'Sharp right', continued: 'then continue' };
+  return { direction: '🔄', instruction: 'U-turn', continued: 'then continue' };
+}
+
+function updateNavDisplay(step, dist) {
+  const distText = dist < 20 ? 'now' : `${Math.round(dist)}m`;
+  document.getElementById('nav-turn').textContent = step.direction;
+  document.getElementById('nav-instruction').textContent = step.instruction;
+  document.getElementById('nav-distance').textContent = distText;
+}
+
+// ─── DISTANCE ──────────────────────────────────────────────────────────────
+function getDistanceM(coord1, coord2) {
+  // coord1, coord2 = [lon, lat] or [lat, lon] — both must be same order
+  const R = 6371000;
+  const dLat = (coord2[1] - coord1[1]) * Math.PI / 180;
+  const dLon = (coord2[0] - coord1[0]) * Math.PI / 180;
+  const a = Math.sin(dLat/2) ** 2 +
+    Math.cos(coord1[1] * Math.PI / 180) * Math.cos(coord2[1] * Math.PI / 180) *
+    Math.sin(dLon/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─── STATS ─────────────────────────────────────────────────────────────────
+function updateStatsDisplay() {
+  const elapsed = getElapsedSeconds();
+  const pace = totalDistance > 0 ? (elapsed / 60 / totalDistance) : 0;
+
+  document.getElementById('s-dist').textContent = totalDistance.toFixed(2);
+  document.getElementById('s-pace').textContent = pace > 0 ? formatPace(pace) : '--';
+  document.getElementById('s-time').textContent = formatTime(elapsed);
+  document.getElementById('s-laps').textContent = laps.length;
+}
+
+function updateLapProgress() {
+  const lapPct = routeCoords.length > 1
+    ? ((currentRouteStepIndex / (routeCoords.length - 1)) * 100).toFixed(0)
+    : '0';
+  const lapNum = laps.length + 1;
+  document.getElementById('lap-label').textContent = `Lap ${lapNum} — ${lapPct}%`;
+  document.getElementById('lap-progress-fill').style.width = lapPct + '%';
+}
+
+function getElapsedSeconds() {
+  if (!startTime) return 0;
+  return Math.floor((Date.now() - startTime - pausedTime) / 1000);
+}
+
+function formatTime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+function formatPace(paceSecondsPerKm) {
+  if (!paceSecondsPerKm || !isFinite(paceSecondsPerKm)) return '--';
+  const m = Math.floor(paceSecondsPerKm / 60);
+  const s = Math.round(paceSecondsPerKm % 60);
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+// ─── ACTION BUTTON ─────────────────────────────────────────────────────────
+function handleAction() {
+  if (!isRunning) startRun();
+  else pauseRun();
+}
+
+function startRun() {
+  if (trailCoords.length === 0) {
+    showToast('Waiting for GPS signal...');
+  }
+  isRunning = true;
+  startTime = Date.now();
+  pausedTime = 0;
+  totalDistance = 0;
+  laps = [];
+  trailCoords = [];
+  currentLap = { startTime: Date.now(), distance: 0, coords: [], insidePark: false };
+  trailLine.setLatLngs([]);
+  currentRouteStepIndex = 0;
+  lastAnnouncedTurnIdx = -1;
+  elevationData = [];
+  lastElevation = null;
+
+  loadRoute();
+  startTracking();
+
+  document.getElementById('action-btn').className = 'running';
+  document.getElementById('action-btn').textContent = '⏹ Stop Run';
+  document.getElementById('stats-panel').classList.add('visible');
+  document.getElementById('nav-display').classList.add('visible');
+  document.getElementById('lap-progress-wrap').classList.add('visible');
+  document.getElementById('map-controls').classList.remove('hidden');
+  document.getElementById('park-name').classList.add('visible');
+  document.getElementById('history-btn').style.display = 'none';
+
+  speak('Run started. Good luck!');
+}
+
+function pauseRun() {
+  isRunning = false;
+  stopTracking();
+
+  const elapsed = getElapsedSeconds();
+  const pace = totalDistance > 0 ? (elapsed / 60 / totalDistance) : 0;
+
+  document.getElementById('action-btn').className = 'ready';
+  document.getElementById('action-btn').textContent = '▶ Start Run';
+  document.getElementById('map-controls').classList.add('hidden');
+  document.getElementById('history-btn').style.display = 'flex';
+
+  if (totalDistance > 50) {
+    saveRun({ distance: totalDistance, time: elapsed, pace, laps, elevationData });
+    showToast('Run saved!');
+  } else {
+    showToast('Run not saved (too short)');
+  }
+
+  updateLapsSummary();
+  speak('Run paused.');
+}
+
+function updateLapsSummary() {
+  const el = document.getElementById('laps-summary');
+  if (laps.length === 0) { el.classList.remove('visible'); return; }
+  el.classList.add('visible');
+  el.innerHTML = laps.map((lap, i) => `
+    <div class="lap-row">
+      <span class="lap-num">Lap ${i + 1}</span>
+      <span class="lap-time">${formatTime(Math.round(lap.time))}</span>
+      <span class="lap-pace">${formatPace(lap.pace)} /km</span>
+    </div>
+  `).join('');
+}
+
+// ─── HISTORY ──────────────────────────────────────────────────────────────
+function saveRun(data) {
+  const runs = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  runs.unshift({ ...data, date: Date.now() });
+  if (runs.length > 50) runs.splice(50);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(runs));
+  loadHistory();
+}
+
+function loadHistory() {
+  const runs = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  const list = document.getElementById('history-list');
+  if (runs.length === 0) {
+    list.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px 0">No runs yet. Go for a jog! 🏃</p>';
+    return;
+  }
+  list.innerHTML = runs.map((run, i) => {
+    const d = new Date(run.date);
+    const dateStr = d.toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="run-card" data-idx="${i}">
+        <div class="rc-top">
+          <span class="rc-date">${dateStr} · ${timeStr}</span>
+          ${run.laps?.length ? `<span class="rc-laps">${run.laps.length} lap${run.laps.length > 1 ? 's' : ''}</span>` : ''}
+        </div>
+        <div class="rc-stats">
+          <div class="rc-stat"><div class="rcv">${(run.distance / 1000).toFixed(2)}</div><div class="rcl">KM</div></div>
+          <div class="rc-stat"><div class="rcv">${formatTime(run.time)}</div><div class="rcl">TIME</div></div>
+          <div class="rc-stat"><div class="rcv">${formatPace(run.pace)}</div><div class="rcl">PACE</div></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Tap to view trail replay (stub — just show toast)
+  list.querySelectorAll('.run-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const idx = parseInt(card.dataset.idx);
+      const run = runs[idx];
+      showToast(`Run on ${new Date(run.date).toLocaleDateString('en-SG')} — ${(run.distance/1000).toFixed(2)}km`);
+    });
+  });
+}
+
+// ─── PANELS ────────────────────────────────────────────────────────────────
+function togglePanel(name) {
+  document.getElementById('history-panel').classList.toggle('visible', name === 'history');
+  if (name !== 'history') {
+    document.getElementById('history-panel').classList.remove('visible');
+  }
+}
+
+// ─── TOAST ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => el.classList.remove('visible'), 2500);
+}
+</script>
+</body>
+</html>
