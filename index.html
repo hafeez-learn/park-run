@@ -174,6 +174,18 @@
   #voice-toggle:checked { background: var(--accent); }
   #voice-toggle:checked::after { left: 20px; background: #fff; }
 
+  /* MAP STYLE SELECTOR */
+  #map-style-row {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 13px; color: var(--muted);
+  }
+  #map-style-row select {
+    background: var(--card); color: var(--text); border: none;
+    border-radius: 8px; padding: 5px 10px; font-size: 13px;
+    font-family: 'Inter', sans-serif; cursor: pointer;
+  }
+  #map-style-row select:active { transform: scale(0.98); }
+
   /* HISTORY PANEL */
   #history-panel {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -317,6 +329,16 @@
     <input type="checkbox" id="voice-toggle" checked>
   </div>
 
+  <div id="map-style-row">
+    🗺️ Style
+    <select id="map-style-select">
+      <option value="satellite">Satellite</option>
+      <option value="terrain">Terrain</option>
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+  </div>
+
   <button id="action-btn" class="ready">▶ Start Run</button>
 </div>
 
@@ -348,6 +370,15 @@ const ANNOUNCE_DIST_M = 120;
 const AUTO_LAP = true;
 const HISTORY_KEY = 'parkrun_history_v1';
 const VOICE_CACHE_KEY = 'parkrun_voice_ok_v1';
+const TILE_STYLE_KEY = 'parkrun_tile_v1';
+
+const TILE_URLS = {
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  terrain: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+};
+const ACTIVE_TILE_URL = TILE_URLS[localStorage.getItem(TILE_STYLE_KEY) || 'satellite'];
 
 // ─── STATE ────────────────────────────────────────────────────────────────
 let map, trailLine;
@@ -380,6 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
   checkVoiceCache();
   checkPermissionState();
   loadHistory();
+
+  const savedStyle = localStorage.getItem(TILE_STYLE_KEY) || 'satellite';
+  document.getElementById('map-style-select').value = savedStyle;
 });
 
 // ─── MAP ──────────────────────────────────────────────────────────────────
@@ -391,9 +425,12 @@ function initMap() {
     attributionControl: false,
   });
 
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  L.tileLayer(ACTIVE_TILE_URL, {
     maxZoom: 19,
   }).addTo(map);
+
+  // Store reference so we can swap tiles later
+  window._tileLayer = map._layers[Object.keys(map._layers).find(k => map._layers[k] instanceof L.TileLayer)];
 
   // Park circle overlay
   L.circle(PARK_CENTER, {
@@ -435,6 +472,12 @@ function bindEvents() {
       trySpeak('Voice on');
       localStorage.setItem(VOICE_CACHE_KEY, '1');
     }
+  });
+
+  document.getElementById('map-style-select').addEventListener('change', (e) => {
+    const style = e.target.value;
+    localStorage.setItem(TILE_STYLE_KEY, style);
+    window._tileLayer.setUrl(TILE_URLS[style]);
   });
 
   // Map tap on trail — show pace at that point
