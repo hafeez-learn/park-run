@@ -56,6 +56,15 @@
     font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
   #topbar .icon-btn:active { transform: scale(0.95); }
+  #topbar .icon-btn .badge-count {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--accent); color: #000;
+    font-size: 10px; font-weight: 700; font-family: 'Inter', sans-serif;
+    min-width: 16px; height: 16px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 3px;
+    position: absolute;
+  }
 
   /* STATS PANEL */
   #stats-panel {
@@ -186,6 +195,51 @@
   }
   #map-style-row select:active { transform: scale(0.98); }
 
+  /* BADGE PANEL */
+  #badge-panel, #daily-panel {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: var(--bg);
+    display: none; flex-direction: column;
+    overflow-y: auto;
+  }
+  #badge-panel.visible, #daily-panel.visible { display: flex; }
+  #badge-header, #daily-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px; border-bottom: 1px solid var(--card);
+    position: sticky; top: 0; background: var(--bg); z-index: 1;
+  }
+  #badge-header h2, #daily-header h2 { font-size: 20px; font-weight: 700; }
+  #badge-list { padding: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .badge-card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 16px 12px; text-align: center; cursor: default;
+  }
+  .badge-card.earned { border: 1.5px solid var(--accent); }
+  .badge-card.locked { opacity: 0.4; }
+  .badge-emoji { font-size: 32px; margin-bottom: 6px; display: block; }
+  .badge-label { font-size: 12px; font-weight: 600; color: var(--text); display: block; }
+  .badge-desc { font-size: 10px; color: var(--muted); margin-top: 3px; display: block; }
+
+  /* DAILY PANEL */
+  #daily-content { padding: 16px; }
+  .daily-card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 20px; text-align: center;
+  }
+  .daily-card .dc-emoji { font-size: 48px; margin-bottom: 12px; }
+  .daily-card .dc-target { font-size: 15px; color: var(--muted); margin-bottom: 16px; }
+  .daily-progress-bar {
+    width: 100%; height: 10px; background: var(--bg2);
+    border-radius: 5px; overflow: hidden; margin-bottom: 10px;
+  }
+  .daily-progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 5px; width: 0%; transition: width 0.5s;
+  }
+  .daily-stat { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--accent); }
+  .daily-stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  .daily-complete { font-size: 20px; margin-top: 12px; }
+
   /* HISTORY PANEL */
   #history-panel {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -279,7 +333,11 @@
 
 <div id="topbar">
   <div class="logo">Park<span>Run</span></div>
-  <button class="icon-btn" id="history-btn" aria-label="History">📋</button>
+  <div style="display:flex;gap:8px;">
+    <button class="icon-btn" id="daily-btn" aria-label="Daily Challenge">🎯</button>
+    <button class="icon-btn" id="badge-btn" aria-label="Achievements">🏆</button>
+    <button class="icon-btn" id="history-btn" aria-label="History">📋</button>
+  </div>
 </div>
 
 <div id="park-name">🏃 Punggol Park</div>
@@ -350,6 +408,32 @@
   <div id="history-list"></div>
 </div>
 
+<div id="badge-panel">
+  <div id="badge-header">
+    <h2>🏆 Achievements</h2>
+    <button class="icon-btn" id="badge-close" aria-label="Close">✕</button>
+  </div>
+  <div id="badge-list"></div>
+</div>
+
+<div id="daily-panel">
+  <div id="daily-header">
+    <h2>🎯 Daily Challenge</h2>
+    <button class="icon-btn" id="daily-close" aria-label="Close">✕</button>
+  </div>
+  <div id="daily-content"></div>
+</div>
+
+<div id="share-card" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:20px;">
+  <div style="position:absolute;top:16px;right:16px;font-size:24px;cursor:pointer;" id="share-card-close">✕</div>
+  <canvas id="run-card-canvas" width="600" height="400" style="width:100%;max-width:360px;border-radius:16px;"></canvas>
+  <div style="display:flex;gap:12px;">
+    <button onclick="downloadRunCard()" id="save-card-btn" style="background:var(--accent);color:#000;border:none;border-radius:20px;padding:12px 24px;font-weight:700;font-size:15px;cursor:pointer;">📥 Save Image</button>
+    <button onclick="shareRunCard()" id="native-share-btn" style="display:none;background:var(--card);color:var(--text);border:1px solid var(--muted);border-radius:20px;padding:12px 24px;font-weight:700;font-size:15px;cursor:pointer;">📤 Share</button>
+  </div>
+  <p style="color:var(--muted);font-size:12px;text-align:center;">Save and share your run card</p>
+</div>
+
 <div id="permission-overlay">
   <div class="icon">🏃</div>
   <h2>Enable Location</h2>
@@ -371,6 +455,8 @@ const AUTO_LAP = true;
 const HISTORY_KEY = 'parkrun_history_v1';
 const VOICE_CACHE_KEY = 'parkrun_voice_ok_v1';
 const TILE_STYLE_KEY = 'parkrun_tile_v1';
+const ACHIEVEMENTS_KEY = 'parkrun_achievements_v1';
+const DAILY_KEY = 'parkrun_daily_v1';
 
 const TILE_URLS = {
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -379,6 +465,20 @@ const TILE_URLS = {
   light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
 };
 const ACTIVE_TILE_URL = TILE_URLS[localStorage.getItem(TILE_STYLE_KEY) || 'satellite'];
+
+// ─── ACHIEVEMENTS ──────────────────────────────────────────────────────────
+const BADGES = [
+  { id: 'first_km',    label: 'First Kilometre',  emoji: '🎯', condition: r => r.distance >= 1000 },
+  { id: 'first_5k',    label: 'First 5K',          emoji: '🏅', condition: r => r.distance >= 5000 },
+  { id: '10k',         label: '10 Kilometres',     emoji: '🔥', condition: r => r.distance >= 10000 },
+  { id: 'walk_30',     label: '30 Min Walker',     emoji: '🚶', condition: r => r.time >= 1800 },
+  { id: 'run_30',      label: '30 Min Runner',    emoji: '🏃', condition: r => r.time >= 1800 && r.distance >= 3000 },
+  { id: 'streak_3',    label: '3-Day Streak',      emoji: '⚡', condition: (_, stats) => stats.streak >= 3 },
+  { id: 'streak_7',    label: 'Week Warrior',      emoji: '💪', condition: (_, stats) => stats.streak >= 7 },
+  { id: 'early_bird',  label: 'Early Bird',        emoji: '🌅', condition: r => { const h = new Date(r.date).getHours(); return h >= 5 && h < 7; } },
+  { id: 'laps_3',      label: 'Triple Laps',       emoji: '🔄', condition: r => (r.laps?.length || 0) >= 3 },
+  { id: 'laps_5',      label: 'Five Laps',         emoji: '🌟', condition: r => (r.laps?.length || 0) >= 5 },
+];
 
 // ─── STATE ────────────────────────────────────────────────────────────────
 let map, trailLine;
@@ -402,6 +502,7 @@ let currentRouteStepIndex = 0;
 let baro = null;
 let lastElevation = null;
 let voiceOk = false;
+let unlockedBadges = [];
 let _voiceLoadTimeout = null;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
@@ -464,6 +565,11 @@ function bindEvents() {
   document.getElementById('grant-btn').addEventListener('click', requestPermission);
   document.getElementById('history-btn').addEventListener('click', () => togglePanel('history'));
   document.getElementById('history-close').addEventListener('click', () => togglePanel(''));
+  document.getElementById('badge-btn').addEventListener('click', () => togglePanel('badges'));
+  document.getElementById('badge-close').addEventListener('click', () => togglePanel(''));
+  document.getElementById('daily-btn').addEventListener('click', () => togglePanel('daily'));
+  document.getElementById('daily-close').addEventListener('click', () => togglePanel(''));
+  document.getElementById('share-card-close').addEventListener('click', closeShareCard);
   document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn());
   document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut());
 
@@ -920,6 +1026,16 @@ function pauseRun() {
   speak('Run paused.');
 }
 
+function saveRun(data) {
+  const runs = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  runs.unshift({ ...data, date: Date.now() });
+  if (runs.length > 50) runs.splice(50);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(runs));
+  loadHistory();
+  checkAndAwardBadges(data);
+  updateDailyProgress(data);
+}
+
 function updateLapsSummary() {
   const el = document.getElementById('laps-summary');
   if (laps.length === 0) { el.classList.remove('visible'); return; }
@@ -934,14 +1050,6 @@ function updateLapsSummary() {
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────
-function saveRun(data) {
-  const runs = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-  runs.unshift({ ...data, date: Date.now() });
-  if (runs.length > 50) runs.splice(50);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(runs));
-  loadHistory();
-}
-
 function loadHistory() {
   const runs = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
   const list = document.getElementById('history-list');
@@ -968,12 +1076,12 @@ function loadHistory() {
     `;
   }).join('');
 
-  // Tap to view trail replay (stub — just show toast)
+  // Tap to share run card
   list.querySelectorAll('.run-card').forEach(card => {
     card.addEventListener('click', () => {
       const idx = parseInt(card.dataset.idx);
       const run = runs[idx];
-      showToast(`Run on ${new Date(run.date).toLocaleDateString('en-SG')} — ${(run.distance/1000).toFixed(2)}km`);
+      showShareCard(run);
     });
   });
 }
@@ -981,9 +1089,129 @@ function loadHistory() {
 // ─── PANELS ────────────────────────────────────────────────────────────────
 function togglePanel(name) {
   document.getElementById('history-panel').classList.toggle('visible', name === 'history');
-  if (name !== 'history') {
-    document.getElementById('history-panel').classList.remove('visible');
+  document.getElementById('badge-panel').classList.toggle('visible', name === 'badges');
+  document.getElementById('daily-panel').classList.toggle('visible', name === 'daily');
+  if (name === 'badges') renderBadges();
+  if (name === 'daily') renderDaily();
+}
+
+// ─── ACHIEVEMENTS ──────────────────────────────────────────────────────────
+function getRunStats() {
+  const runs = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  if (runs.length === 0) return { totalDist: 0, totalRuns: 0, streak: 0 };
+  let streak = 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const sorted = [...runs].sort((a,b) => b.date - a.date);
+  for (let i = 0; i < sorted.length; i++) {
+    const d = new Date(sorted[i].date); d.setHours(0,0,0,0);
+    const daysDiff = Math.round((today - d) / 86400000);
+    if (i === 0 && daysDiff <= 1) streak = 1;
+    else if (i > 0) {
+      const pd = new Date(sorted[i-1].date); pd.setHours(0,0,0,0);
+      if (Math.round((pd - d) / 86400000) === 1) { if (streak === 0) streak = 1; streak++; }
+      else break;
+    }
   }
+  return {
+    totalDist: runs.reduce((s, r) => s + r.distance, 0),
+    totalRuns: runs.length,
+    streak,
+  };
+}
+
+function checkAndAwardBadges(run) {
+  const earned = JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY) || '[]');
+  const stats = getRunStats();
+  const newBadges = [];
+  for (const badge of BADGES) {
+    if (earned.includes(badge.id)) continue;
+    if (badge.condition(run, stats)) {
+      earned.push(badge.id);
+      newBadges.push(badge);
+    }
+  }
+  if (newBadges.length > 0) {
+    localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(earned));
+    setTimeout(() => {
+      newBadges.forEach(b => showToast(`🏆 Badge unlocked: ${b.emoji} ${b.label}`));
+    }, 1500);
+  }
+  return newBadges;
+}
+
+function renderBadges() {
+  const earned = JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY) || '[]');
+  const list = document.getElementById('badge-list');
+  list.innerHTML = BADGES.map(b => {
+    const isEarned = earned.includes(b.id);
+    return `<div class="badge-card ${isEarned ? 'earned' : 'locked'}">
+      <span class="badge-emoji">${b.emoji}</span>
+      <span class="badge-label">${b.label}</span>
+      <span class="badge-desc">${isEarned ? 'Unlocked!' : 'Locked'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── DAILY CHALLENGE ───────────────────────────────────────────────────────
+const DAILY_CHALLENGES = [
+  { id: 'walk_2k',   label: 'Walk 2 Kilometres',  emoji: '🚶', unit: 'km', target: 2, icon: '🚶' },
+  { id: 'run_3k',    label: 'Run 3 Kilometres',   emoji: '🏃', unit: 'km', target: 3, icon: '🏃' },
+  { id: 'move_30m',  label: 'Move for 30 Minutes',emoji: '⏱️', unit: 'min', target: 30, icon: '⏱️' },
+  { id: 'laps_2',    label: 'Complete 2 Laps',    emoji: '🔄', unit: 'laps', target: 2, icon: '🔄' },
+  { id: 'walk_5k',   label: 'Walk 5 Kilometres',  emoji: '🚶', unit: 'km', target: 5, icon: '🚶' },
+  { id: 'run_5k',    label: 'Run 5 Kilometres',   emoji: '🏃', emoji2: '🔥', unit: 'km', target: 5, icon: '🏃' },
+  { id: 'speed_20',  label: '20 Min Movement',     emoji: '⚡', unit: 'min', target: 20, icon: '⚡' },
+  { id: '4laps',     label: 'Four Laps',           emoji: '🔄', emoji2: '💨', unit: 'laps', target: 4, icon: '🔄' },
+];
+
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+
+function getDailyChallenge() {
+  const all = JSON.parse(localStorage.getItem(DAILY_KEY) || '{}');
+  const today = getTodayKey();
+  if (!all[today]) {
+    const challenge = DAILY_CHALLENGES[Math.floor(Math.random() * DAILY_CHALLENGES.length)];
+    const runs = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    all[today] = { ...challenge, completed: false, progress: 0 };
+    localStorage.setItem(DAILY_KEY, JSON.stringify(all));
+  }
+  return all[today];
+}
+
+function updateDailyProgress(run) {
+  const all = JSON.parse(localStorage.getItem(DAILY_KEY) || '{}');
+  const today = getTodayKey();
+  if (!all[today]) return;
+  const c = all[today];
+  if (c.completed) return;
+  if (c.unit === 'km') c.progress = Math.max(c.progress, run.distance / 1000);
+  else if (c.unit === 'min') c.progress = Math.max(c.progress, run.time / 60);
+  else if (c.unit === 'laps') c.progress = Math.max(c.progress, run.laps?.length || 0);
+  if (c.progress >= c.target) {
+    c.completed = true;
+    setTimeout(() => showToast(`🎯 Daily challenge complete! ${c.emoji2 || c.emoji} ${c.label}`), 2000);
+  }
+  all[today] = c;
+  localStorage.setItem(DAILY_KEY, JSON.stringify(all));
+}
+
+function renderDaily() {
+  const c = getDailyChallenge();
+  const pct = Math.min(100, Math.round((c.progress / c.target) * 100));
+  const el = document.getElementById('daily-content');
+  el.innerHTML = `
+    <div class="daily-card">
+      <div class="dc-emoji">${c.completed ? c.emoji2 || c.emoji : c.emoji}</div>
+      <div class="dc-target">${c.label}</div>
+      <div class="daily-progress-bar"><div class="daily-progress-fill" style="width:${pct}%"></div></div>
+      <div class="daily-stat">${c.progress.toFixed(1)} / ${c.target} ${c.unit}</div>
+      <div class="daily-stat-label">${pct}% complete</div>
+      ${c.completed ? `<div class="daily-complete">✅ Challenge complete!</div>` : ''}
+    </div>
+  `;
 }
 
 // ─── TOAST ─────────────────────────────────────────────────────────────────
@@ -993,6 +1221,104 @@ function showToast(msg) {
   el.classList.add('visible');
   clearTimeout(window._toastTimer);
   window._toastTimer = setTimeout(() => el.classList.remove('visible'), 2500);
+}
+
+// ─── SHAREABLE RUN CARD ────────────────────────────────────────────────────
+let _lastRunData = null;
+
+function showShareCard(run) {
+  _lastRunData = run;
+  const el = document.getElementById('share-card');
+  el.style.display = 'flex';
+  drawRunCard(run);
+  if (navigator.share) {
+    document.getElementById('native-share-btn').style.display = 'block';
+  }
+}
+
+function closeShareCard() {
+  document.getElementById('share-card').style.display = 'none';
+}
+
+function drawRunCard(run) {
+  const canvas = document.getElementById('run-card-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = 600, H = 400;
+
+  // Background
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#1a1a2e');
+  grad.addColorStop(1, '#16213e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Accent line at top
+  ctx.fillStyle = '#00d2ff';
+  ctx.fillRect(0, 0, W, 5);
+
+  // Date
+  const d = new Date(run.date);
+  ctx.fillStyle = '#8892a0';
+  ctx.font = '500 22px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(d.toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), W/2, 52);
+
+  // Distance (big)
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 96px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText((run.distance / 1000).toFixed(2), W/2, 175);
+
+  ctx.fillStyle = '#8892a0';
+  ctx.font = '500 28px Inter, sans-serif';
+  ctx.fillText('km', W/2, 215);
+
+  // Stats row
+  const stats = [
+    { label: 'TIME', value: formatTime(run.time) },
+    { label: 'PACE', value: formatPace(run.pace) + ' /km' },
+    { label: 'LAPS', value: String(run.laps?.length || 0) },
+  ];
+  const startX = W * 0.15;
+  const step = W * 0.35;
+  stats.forEach((s, i) => {
+    const x = startX + i * step;
+    ctx.fillStyle = '#00d2ff';
+    ctx.font = '700 34px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.value, x, 295);
+    ctx.fillStyle = '#8892a0';
+    ctx.font = '500 18px Inter, sans-serif';
+    ctx.fillText(s.label, x, 328);
+  });
+
+  // Footer
+  ctx.fillStyle = '#3d4a6b';
+  ctx.font = '500 18px Inter, sans-serif';
+  ctx.fillText('🏃 Punggol Park', W/2, 378);
+}
+
+function downloadRunCard() {
+  const canvas = document.getElementById('run-card-canvas');
+  const link = document.createElement('a');
+  link.download = 'parkrun-run-card.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+async function shareRunCard() {
+  if (!navigator.share || !_lastRunData) return;
+  const canvas = document.getElementById('run-card-canvas');
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], 'parkrun-run-card.png', { type: 'image/png' });
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'ParkRun',
+        text: `🏃 Just completed ${(_lastRunData.distance/1000).toFixed(2)}km in ${formatTime(_lastRunData.time)} at Punggol Park!`,
+      });
+    } catch (e) { if (e.name !== 'AbortError') downloadRunCard(); }
+  });
 }
 </script>
 </body>
